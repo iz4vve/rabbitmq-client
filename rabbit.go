@@ -1,17 +1,25 @@
-package rabbit
+// Package rabbit contains all the functions necessary to connect, publish,
+// and subscribe to a RabbitMQ queue. Examples described below and
+// in the README.
+//
+// Copyright (c) 2018 - Pietro Mascolo
+//
+// Author: Pietro Mascolo
+// Email: iz4vve@gmail.com
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
-/* rabbit contains all the functions necessary to connect, publish,
- * and subscribe to a RabbitMQ queue. Examples described below and
- * in the README.
- *
- * Author: Pietro Mascolo
- * Email: iz4vve@gmail.com
- *
- * This file is subject to the terms and conditions defined in
- * file 'LICENSE', which is part of this source code package.
- * If the LICENSE is not present, it can be retrieved at
- * http://www.apache.org/licenses/
- */
+package rabbit
 
 import (
 	"fmt"
@@ -40,6 +48,8 @@ type Connector struct {
 	logger logging.Logger
 }
 
+// NewConnector returns a default Connector.
+// logger is set to a default configuration, on level Info
 func NewConnector() *Connector {
 	conn := Connector{
 		&amqp.Connection{},
@@ -49,6 +59,12 @@ func NewConnector() *Connector {
 	return &conn
 }
 
+// Dial connects the Connector to the RabbitMQ instance.
+// It panics in case the connection cannot be stablished
+//
+// connectionString is in the form:
+// amqp://<username>:<password>@<host>:<port>
+//
 func (rabbit *Connector) Dial(connectionString string) {
 	if connectionString == "" {
 		panic("empty connection string")
@@ -57,13 +73,19 @@ func (rabbit *Connector) Dial(connectionString string) {
 	var err error
 	rabbit.conn, err = amqp.Dial(fmt.Sprintf("%s/", connectionString))
 	if err != nil {
-		panic("failed to connect: " + connectionString + ". " + err.Error())
+		panic(fmt.Sprintf("%s: $v", connectionString, err.Error()))
 	}
 }
 
-func (rabbit *Connector) PublishOnQueue(body []byte, queueName, exchangeName string) error {
+// PublishOnQueue publishes a message on a specific queue in the
+// RabbitMQ instance exchangeName can be an empty string,
+// in which case, the default exchange will be used
+func (rabbit *Connector) PublishOnQueue(
+	body []byte, queueName, exchangeName string,
+) error {
+
 	if rabbit.conn == nil {
-		panic("Tried to send message before connection was initialized. Don't do that.")
+		panic("connection not initialised")
 	}
 	ch, err := rabbit.conn.Channel()
 	defer ch.Close()
@@ -91,6 +113,12 @@ func (rabbit *Connector) PublishOnQueue(body []byte, queueName, exchangeName str
 	return err
 }
 
+// SubscribeToQueue binds the client to a specific queue
+// and starts a listener on that queue.
+// Whenever a message is consumed on the queue,
+// handlerFunc will be invoked on the message.
+// closeCh is the channel that broadcasts a closing signal
+// to the listening goroutine
 func (rabbit *Connector) SubscribeToQueue(
 	qName, consumerName string, handlerFunc func(amqp.Delivery), closeCh chan bool,
 ) error {
@@ -122,12 +150,16 @@ func (rabbit *Connector) SubscribeToQueue(
 	return nil
 }
 
+// Close closes the connection
 func (rabbit *Connector) Close() {
 	if rabbit.conn != nil {
 		rabbit.conn.Close()
 	}
 }
 
+// consumeLoop is the listening function spawned by SubscribeToQueue
+// it consumes messages on a specific topic until it receives the
+// closing signal
 func consumeLoop(
 	deliveries <-chan amqp.Delivery, handlerFunc func(d amqp.Delivery), closeChan chan bool,
 ) {
@@ -144,6 +176,7 @@ func consumeLoop(
 	}
 }
 
+// failOnError panics in the presence of an unrecoverable error
 func failOnError(err error, msg string) {
 	if err != nil {
 		panic(fmt.Sprintf("%s: %s", msg, err))
