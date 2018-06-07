@@ -67,13 +67,17 @@ func NewConnector() *Connector {
 //
 func (rabbit *Connector) Dial(connectionString string) {
 	if connectionString == "" {
-		panic("empty connection string")
+		errStr := "empty connection string"
+		rabbit.logger.Error(errStr)
+		panic(errStr)
 	}
 
 	var err error
 	rabbit.conn, err = amqp.Dial(fmt.Sprintf("%s/", connectionString))
 	if err != nil {
-		panic(fmt.Sprintf("%s: $v", connectionString, err.Error()))
+		errStr := fmt.Sprintf("%s: $v", connectionString, err)
+		rabbit.logger.Error(errStr)
+		panic(errStr)
 	}
 }
 
@@ -85,11 +89,14 @@ func (rabbit *Connector) PublishOnQueue(
 ) error {
 
 	if rabbit.conn == nil {
-		panic("connection not initialised")
+		errStr := "connection not initialised"
+		rabbit.logger.Error(errStr)
+		panic(errStr)
 	}
 	ch, err := rabbit.conn.Channel()
 	defer ch.Close()
 
+	rabbit.logger.Debugf("declaring queue %s", queueName)
 	queue, err := ch.QueueDeclare(
 		queueName,
 		false, // durable
@@ -99,7 +106,8 @@ func (rabbit *Connector) PublishOnQueue(
 		nil,   // arguments
 	)
 
-	// Publishes a message onto the queue.
+	rabbit.logger.Debugf("publishing on queue %s")
+	rabbit.logger.Debugf("message: %v", string(body))
 	err = ch.Publish(
 		exchangeName,
 		queue.Name, // routing key
@@ -118,7 +126,9 @@ func (rabbit *Connector) PublishOnQueue(
 // Whenever a message is consumed on the queue,
 // handlerFunc will be invoked on the message.
 // closeCh is the channel that broadcasts a closing signal
-// to the listening goroutine
+// to the listening goroutine.
+// MaxTO is the maximum time out that the subscription routine is allowed
+// to await.
 func (rabbit *Connector) SubscribeToQueue(
 	qName, consumerName string, handlerFunc func(amqp.Delivery), closeCh chan bool,
 ) error {
@@ -135,6 +145,7 @@ func (rabbit *Connector) SubscribeToQueue(
 	)
 	failOnError(err, "Failed to register an Queue")
 
+	rabbit.logger.Debugf("preparing to consume queue %s", queue.Name)
 	msgs, err := ch.Consume(
 		queue.Name,   // queue
 		consumerName, // consumer
@@ -146,15 +157,18 @@ func (rabbit *Connector) SubscribeToQueue(
 	)
 	failOnError(err, "Failed to register a consumer")
 
+	rabbit.logger.Debugf("starting consumer loop on queue %s", queue.Name)
 	go consumeLoop(msgs, handlerFunc, closeCh)
 	return nil
 }
 
 // Close closes the connection
 func (rabbit *Connector) Close() {
+	rabbit.logger.Infof("Closing amqp connection...")
 	if rabbit.conn != nil {
 		rabbit.conn.Close()
 	}
+	rabbit.logger.Info("Goodbye")
 }
 
 // consumeLoop is the listening function spawned by SubscribeToQueue
@@ -177,8 +191,10 @@ func consumeLoop(
 }
 
 // failOnError panics in the presence of an unrecoverable error
+// everything dies
 func failOnError(err error, msg string) {
 	if err != nil {
-		panic(fmt.Sprintf("%s: %s", msg, err))
+		errStr := fmt.Sprintf("%s: %s", msg, err)
+		panic(errStr)
 	}
 }
