@@ -133,7 +133,7 @@ func (rabbit *Connector) PublishOnQueue(
 // MaxTO is the maximum time out that the subscription routine is allowed
 // to await.
 func (rabbit *Connector) SubscribeToQueue(
-	qName, consumerName string, handlerFunc func(amqp.Delivery), closeCh chan bool,
+	qName, consumerName string, handlerFunc func(amqp.Delivery) error, closeCh chan bool,
 ) error {
 	ch, err := rabbit.conn.Channel()
 	failOnError(err, "Failed to open a channel")
@@ -152,7 +152,7 @@ func (rabbit *Connector) SubscribeToQueue(
 	msgs, err := ch.Consume(
 		queue.Name,   // queue
 		consumerName, // consumer
-		true,         // auto-ack
+		false,        // auto-ack
 		false,        // exclusive
 		false,        // no-local
 		false,        // no-wait
@@ -161,7 +161,7 @@ func (rabbit *Connector) SubscribeToQueue(
 	failOnError(err, "Failed to register a consumer")
 
 	rabbit.logger.Debugf("starting consumer loop on queue %s", queue.Name)
-	go consumeLoop(msgs, handlerFunc, closeCh)
+	go rabbit.consumeLoop(msgs, handlerFunc, closeCh)
 	return nil
 }
 
@@ -177,14 +177,20 @@ func (rabbit *Connector) Close() {
 // consumeLoop is the listening function spawned by SubscribeToQueue
 // it consumes messages on a specific topic until it receives the
 // closing signal
-func consumeLoop(
-	deliveries <-chan amqp.Delivery, handlerFunc func(d amqp.Delivery), closeChan chan bool,
+func (rabbit *Connector) consumeLoop(
+	deliveries <-chan amqp.Delivery, handlerFunc func(d amqp.Delivery) error, closeChan chan bool,
 ) {
 	for {
 		select {
 		case d, ok := <-deliveries:
 			if ok {
-				handlerFunc(d)
+				err := handlerFunc(d)
+				if err != nil {
+					rabbit.logger.Errorf("error processing delivery %v: %v", d, err)
+					d.Reject(true)
+				}
+				rabbit.logger.Debugf("delivery processed: %v", d)
+				d.Ack(true)
 			}
 		case <-closeChan:
 			return
