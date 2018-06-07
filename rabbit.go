@@ -50,10 +50,13 @@ type Connector struct {
 
 // NewConnector returns a default Connector.
 // logger is set to a default configuration, on level Info
-func NewConnector() *Connector {
+func NewConnector(logConfig string) *Connector {
+	if logConfig == "" {
+		logConfig = "./log-config.yaml"
+	}
 	conn := Connector{
 		&amqp.Connection{},
-		logger.GetCustomLogger("./log-config.yaml"),
+		logger.GetCustomLogger(logConfig),
 	}
 
 	return &conn
