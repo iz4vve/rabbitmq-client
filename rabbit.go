@@ -52,6 +52,15 @@ type Connector struct {
 // logger is set to a default configuration, on level Info
 func NewConnector(logConfig string) *Connector {
 	if logConfig == "" {
+		// _, filename, _, ok := runtime.Caller(0)
+		// fmt.Println(filename)
+		// fmt.Println(path.Dir(filename))
+		// fmt.Println()
+		// if !ok {
+		// 	panic("couldn't determine current directory")
+		// }
+		// // logConfig = path.Join(path.Dir(filename), "log-config.yaml")
+		// // fmt.Println(logConfig)
 		logConfig = "./log-config.yaml"
 	}
 	conn := Connector{
