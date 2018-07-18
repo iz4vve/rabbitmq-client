@@ -87,7 +87,7 @@ func (rabbit *Connector) Dial(connectionString string) {
 	var err error
 	rabbit.conn, err = amqp.Dial(fmt.Sprintf("%s/", connectionString))
 	if err != nil {
-		errStr := fmt.Sprintf("%s: $v", connectionString, err)
+		errStr := fmt.Sprintf("%s: %v", connectionString, err)
 		rabbit.logger.Error(errStr)
 		panic(errStr)
 	}
