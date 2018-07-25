@@ -22,6 +22,7 @@
 package rabbit
 
 import (
+	"errors"
 	"fmt"
 
 	logging "github.com/hhkbp2/go-logging"
@@ -77,11 +78,11 @@ func NewConnector(logConfig string) *Connector {
 // connectionString is in the form:
 // amqp://<username>:<password>@<host>:<port>
 //
-func (rabbit *Connector) Dial(connectionString string) {
+func (rabbit *Connector) Dial(connectionString string) error {
 	if connectionString == "" {
 		errStr := "empty connection string"
 		rabbit.logger.Error(errStr)
-		panic(errStr)
+		return errors.New(errStr)
 	}
 
 	var err error
@@ -89,8 +90,9 @@ func (rabbit *Connector) Dial(connectionString string) {
 	if err != nil {
 		errStr := fmt.Sprintf("%s: %v", connectionString, err)
 		rabbit.logger.Error(errStr)
-		panic(errStr)
+		return errors.New(errStr)
 	}
+	return nil
 }
 
 // PublishOnQueue publishes a message on a specific queue in the
