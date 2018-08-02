@@ -18,15 +18,15 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
 package rabbit
 
 import (
 	"errors"
 	"fmt"
 
-	logging "github.com/hhkbp2/go-logging"
-	"github.com/iz4vve/logger"
+	// logging "github.com/hhkbp2/go-logging"
+	// "github.com/iz4vve/logger"
+
 	"github.com/streadway/amqp"
 )
 
@@ -45,28 +45,14 @@ import (
 //
 //
 type Connector struct {
-	conn   *amqp.Connection
-	logger logging.Logger
+	conn *amqp.Connection
 }
 
 // NewConnector returns a default Connector.
 // logger is set to a default configuration, on level Info
 func NewConnector(logConfig string) *Connector {
-	if logConfig == "" {
-		// _, filename, _, ok := runtime.Caller(0)
-		// fmt.Println(filename)
-		// fmt.Println(path.Dir(filename))
-		// fmt.Println()
-		// if !ok {
-		// 	panic("couldn't determine current directory")
-		// }
-		// // logConfig = path.Join(path.Dir(filename), "log-config.yaml")
-		// // fmt.Println(logConfig)
-		logConfig = "./log-config.yaml"
-	}
 	conn := Connector{
 		&amqp.Connection{},
-		logger.GetCustomLogger(logConfig),
 	}
 
 	return &conn
@@ -81,7 +67,6 @@ func NewConnector(logConfig string) *Connector {
 func (rabbit *Connector) Dial(connectionString string) error {
 	if connectionString == "" {
 		errStr := "empty connection string"
-		rabbit.logger.Error(errStr)
 		return errors.New(errStr)
 	}
 
@@ -89,7 +74,6 @@ func (rabbit *Connector) Dial(connectionString string) error {
 	rabbit.conn, err = amqp.Dial(fmt.Sprintf("%s/", connectionString))
 	if err != nil {
 		errStr := fmt.Sprintf("%s: %v", connectionString, err)
-		rabbit.logger.Error(errStr)
 		return errors.New(errStr)
 	}
 	return nil
@@ -104,13 +88,11 @@ func (rabbit *Connector) PublishOnQueue(
 
 	if rabbit.conn == nil {
 		errStr := "connection not initialised"
-		rabbit.logger.Error(errStr)
 		panic(errStr)
 	}
 	ch, err := rabbit.conn.Channel()
 	defer ch.Close()
 
-	rabbit.logger.Debugf("declaring queue %s", queueName)
 	queue, err := ch.QueueDeclare(
 		queueName,
 		false, // durable
@@ -120,8 +102,6 @@ func (rabbit *Connector) PublishOnQueue(
 		nil,   // arguments
 	)
 
-	rabbit.logger.Debugf("publishing on queue %s")
-	rabbit.logger.Debugf("message: %v", string(body))
 	err = ch.Publish(
 		exchangeName,
 		queue.Name, // routing key
@@ -131,7 +111,6 @@ func (rabbit *Connector) PublishOnQueue(
 			ContentType: "application/json",
 			Body:        body,
 		})
-	rabbit.logger.Debugf("message sent to queue %v: %v", queueName, body)
 	return err
 }
 
@@ -159,7 +138,6 @@ func (rabbit *Connector) SubscribeToQueue(
 	)
 	failOnError(err, "Failed to register an Queue")
 
-	rabbit.logger.Debugf("preparing to consume queue %s", queue.Name)
 	msgs, err := ch.Consume(
 		queue.Name,   // queue
 		consumerName, // consumer
@@ -171,18 +149,15 @@ func (rabbit *Connector) SubscribeToQueue(
 	)
 	failOnError(err, "Failed to register a consumer")
 
-	rabbit.logger.Debugf("starting consumer loop on queue %s", queue.Name)
 	go rabbit.consumeLoop(msgs, handlerFunc, closeCh)
 	return nil
 }
 
 // Close closes the connection
 func (rabbit *Connector) Close() {
-	rabbit.logger.Infof("Closing amqp connection...")
 	if rabbit.conn != nil {
 		rabbit.conn.Close()
 	}
-	rabbit.logger.Info("Goodbye")
 }
 
 // consumeLoop is the listening function spawned by SubscribeToQueue
@@ -197,10 +172,8 @@ func (rabbit *Connector) consumeLoop(
 			if ok {
 				err := handlerFunc(d)
 				if err != nil {
-					rabbit.logger.Errorf("error processing delivery %v: %v", d, err)
 					d.Reject(true)
 				}
-				rabbit.logger.Debugf("delivery processed: %v", d)
 				d.Ack(true)
 			}
 		case <-closeChan:
