@@ -83,7 +83,7 @@ func (rabbit *Connector) Dial(connectionString string) error {
 // RabbitMQ instance exchangeName can be an empty string,
 // in which case, the default exchange will be used
 func (rabbit *Connector) PublishOnQueue(
-	body []byte, queueName, exchangeName string,
+	body []byte, queueName, exchangeName string, durable bool,
 ) error {
 
 	if rabbit.conn == nil {
@@ -95,11 +95,11 @@ func (rabbit *Connector) PublishOnQueue(
 
 	queue, err := ch.QueueDeclare(
 		queueName,
-		false, // durable
-		false, // delete when unused
-		false, // exclusive
-		false, // no-wait
-		nil,   // arguments
+		durable, // durable
+		false,   // delete when unused
+		false,   // exclusive
+		false,   // no-wait
+		nil,     // arguments
 	)
 
 	err = ch.Publish(
@@ -123,18 +123,18 @@ func (rabbit *Connector) PublishOnQueue(
 // MaxTO is the maximum time out that the subscription routine is allowed
 // to await.
 func (rabbit *Connector) SubscribeToQueue(
-	qName, consumerName string, handlerFunc func(amqp.Delivery) error, closeCh chan bool,
+	qName, consumerName string, handlerFunc func(amqp.Delivery) error, closeCh chan bool, durable bool,
 ) error {
 	ch, err := rabbit.conn.Channel()
 	failOnError(err, "Failed to open a channel")
 
 	queue, err := ch.QueueDeclare(
-		qName, // name of the queue
-		false, // durable
-		false, // delete when usused
-		false, // exclusive
-		false, // noWait
-		nil,   // arguments
+		qName,   // name of the queue
+		durable, // durable
+		false,   // delete when usused
+		false,   // exclusive
+		false,   // noWait
+		nil,     // arguments
 	)
 	failOnError(err, "Failed to register an Queue")
 
