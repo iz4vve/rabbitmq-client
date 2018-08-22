@@ -50,11 +50,10 @@ type Connector struct {
 
 // NewConnector returns a default Connector.
 // logger is set to a default configuration, on level Info
-func NewConnector(logConfig string) *Connector {
+func NewConnector() *Connector {
 	conn := Connector{
 		&amqp.Connection{},
 	}
-
 	return &conn
 }
 
