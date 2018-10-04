@@ -23,6 +23,8 @@ package rabbit
 import (
 	"errors"
 	"fmt"
+	"log"
+	"time"
 
 	// logging "github.com/hhkbp2/go-logging"
 	// "github.com/iz4vve/logger"
@@ -63,19 +65,31 @@ func NewConnector() *Connector {
 // connectionString is in the form:
 // amqp://<username>:<password>@<host>:<port>
 //
-func (rabbit *Connector) Dial(connectionString string) error {
+// timeout is the timeout between subsequent attempts at reconnecting
+// maxTries is the maximum number of times the client will try to reconnect
+//
+func (rabbit *Connector) Dial(connectionString string, timeout, maxTries int) error {
 	if connectionString == "" {
 		errStr := "empty connection string"
 		return errors.New(errStr)
 	}
 
 	var err error
-	rabbit.conn, err = amqp.Dial(fmt.Sprintf("%s/", connectionString))
-	if err != nil {
-		errStr := fmt.Sprintf("%s: %v", connectionString, err)
-		return errors.New(errStr)
+	attempts := 0
+	for {
+		rabbit.conn, err = amqp.Dial(fmt.Sprintf("%s/", connectionString))
+		if err == nil {
+			return nil
+		}
+
+		attempts++
+		log.Printf("Connection attempt failed. Number of attemps: %d/%d\n", attempts, maxTries)
+		if attempts > maxTries {
+			log.Println("Max number of reconnects reached")
+			return fmt.Errorf("failed to connect to %s after %d tries", connectionString, maxTries)
+		}
+		time.Sleep(time.Second * time.Duration(timeout))
 	}
-	return nil
 }
 
 // PublishOnQueue publishes a message on a specific queue in the
