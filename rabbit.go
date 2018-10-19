@@ -65,8 +65,8 @@ func NewConnector() *Connector {
 // connectionString is in the form:
 // amqp://<username>:<password>@<host>:<port>
 //
-// timeout is the timeout between subsequent attempts at reconnecting
-// maxTries is the maximum number of times the client will try to reconnect
+// - timeout is the timeout between subsequent attempts at reconnecting
+// - maxTries is the maximum number of times the client will try to reconnect
 //
 func (rabbit *Connector) Dial(connectionString string, timeout, maxTries int) error {
 	if connectionString == "" {
